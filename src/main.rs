@@ -3,10 +3,43 @@ use std::mem::MaybeUninit;
 use std::io;
 use std::fs;
 
+
+
+
+fn get_shell() -> String {
+    unsafe {
+        let ptr = libc::getenv(c"SHELL".as_ptr());
+        if ptr.is_null() {
+            return "Unknown".to_string();
+        }
+        CStr::from_ptr(ptr).to_string_lossy().into_owned()
+    }
+}
+
+fn get_editor() -> String {
+    unsafe {
+        let ptr = libc::getenv(c"EDITOR".as_ptr());
+        if ptr.is_null() {
+            return "".to_string();
+        }
+        CStr::from_ptr(ptr).to_string_lossy().into_owned()
+    }
+}
+
+
+fn print_shell() -> () {
+    println!("Shell:        {}", get_shell());
+}
+
+fn print_editor() -> () {
+    println!("Editor:       {}", get_editor());
+}
+
+
 fn read_entire_file(path: &str) -> String {
     fs::read_to_string(path)
         .map(|s| s.trim().to_string())
-        .unwrap_or_else(|_| "Unknown".to_string())
+        .expect("Unknown")
 }
 
 fn print_uptime() -> () {
@@ -53,7 +86,6 @@ fn print_cpu_info(sys: &sysinfo::System) {
         }
         println!("Cores:        {} (Logical)", sys.cpus().len());
 }
-
 
 fn print_bios_info() -> () {
     let bios_vendor =
@@ -106,7 +138,7 @@ impl UtsName {
 }
 
 fn main() {
-    let name = UtsName::get().unwrap();
+    let name = UtsName::get().expect("Uname failed.");
     println!("Hostname:     {}", name.nodename);
     println!("OS:           {}", name.sysname);
     println!("Machine:      {}", name.machine);
@@ -126,4 +158,6 @@ fn main() {
     print_motherboard_info();
     print_cpu_info(&mut sys);
     print_uptime();
+    print_shell();
+    print_editor();
 }
