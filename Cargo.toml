@@ -7,4 +7,5 @@ edition = "2024"
 libc = "0.2.189"
 pollster = "1.0.1"
 wgpu = "30.0.1"
+nix = { version = "0.31.3", features = ["user", "hostname"] }
 sysinfo = "0.39.6"
