@@ -3,8 +3,12 @@ use std::mem::MaybeUninit;
 use std::io;
 use std::fs;
 
-
-
+#[inline]
+fn cstr_to_str(ptr: *const core::ffi::c_char) -> String {
+    unsafe {
+        CStr::from_ptr(ptr).to_string_lossy().into_owned()
+    }
+}
 
 fn get_shell() -> String {
     unsafe {
@@ -12,7 +16,7 @@ fn get_shell() -> String {
         if ptr.is_null() {
             return "Unknown".to_string();
         }
-        CStr::from_ptr(ptr).to_string_lossy().into_owned()
+        cstr_to_str(ptr)
     }
 }
 
@@ -22,20 +26,21 @@ fn get_editor() -> String {
         if ptr.is_null() {
             return "".to_string();
         }
-        CStr::from_ptr(ptr).to_string_lossy().into_owned()
+        cstr_to_str(ptr)
     }
 }
 
-
+#[inline]
 fn print_shell() -> () {
     println!("Shell:        {}", get_shell());
 }
 
+#[inline]
 fn print_editor() -> () {
     println!("Editor:       {}", get_editor());
 }
 
-
+#[inline]
 fn read_entire_file(path: &str) -> String {
     fs::read_to_string(path)
         .map(|s| s.trim().to_string())
@@ -44,12 +49,10 @@ fn read_entire_file(path: &str) -> String {
 
 fn print_uptime() -> () {
     let uptime_secs = sysinfo::System::uptime();
-
     let days = uptime_secs / 86400;
     let hours = (uptime_secs % 86400) / 3600;
     let minutes = (uptime_secs % 3600) / 60;
     let seconds = uptime_secs % 60;
-
     println!("Uptime:       {}d {}h {}m {}s", days, hours, minutes, seconds);
 }
 
@@ -68,7 +71,6 @@ fn print_graphics_info(adapter: wgpu::Adapter, sys: &mut sysinfo::System) {
     println!("Device type:  {}", device_type);
     println!("RAM Capacity: {} MiB", sys.total_memory() / 1024 / 1024);
     println!("Usable RAM:   {} MiB", sys.available_memory() / 1024 / 1024);
-
 }
 
 fn print_motherboard_info() {
@@ -84,7 +86,7 @@ fn print_cpu_info(sys: &sysinfo::System) {
         if let Some(cpu) = sys.cpus().first() {
             println!("CPU:          {}", cpu.brand());
         }
-        println!("Cores:        {} (Logical)", sys.cpus().len());
+        println!("Cores:        {}", sys.cpus().len());
 }
 
 fn print_bios_info() -> () {
