@@ -1,7 +1,6 @@
 use std::ffi::CStr;
-use std::mem::MaybeUninit;
-use std::io;
 use std::fs;
+use sysinfo;
 
 #[inline]
 fn cstr_to_str(ptr: *const core::ffi::c_char) -> String {
@@ -31,12 +30,12 @@ fn get_editor() -> String {
 }
 
 #[inline]
-fn print_shell() -> () {
+fn print_shell() {
     println!("Shell:        {}", get_shell());
 }
 
 #[inline]
-fn print_editor() -> () {
+fn print_editor()  {
     println!("Editor:       {}", get_editor());
 }
 
@@ -47,7 +46,7 @@ fn read_entire_file(path: &str) -> String {
         .expect("Unknown")
 }
 
-fn print_uptime() -> () {
+fn print_uptime() {
     let uptime_secs = sysinfo::System::uptime();
     let days = uptime_secs / 86400;
     let hours = (uptime_secs % 86400) / 3600;
@@ -56,7 +55,7 @@ fn print_uptime() -> () {
     println!("Uptime:       {}d {}h {}m {}s", days, hours, minutes, seconds);
 }
 
-fn print_graphics_info(adapter: wgpu::Adapter, sys: &mut sysinfo::System) {
+fn print_graphics_info(adapter: wgpu::Adapter) {
     use wgpu::DeviceType::*;
     let info = adapter.get_info();
     println!("GPU Name:     {}", info.name);
@@ -69,6 +68,9 @@ fn print_graphics_info(adapter: wgpu::Adapter, sys: &mut sysinfo::System) {
         Other => "Other",
     };
     println!("Device type:  {}", device_type);
+}
+
+fn print_available_memory(sys: &mut sysinfo::System) {
     println!("RAM Capacity: {} MiB", sys.total_memory() / 1024 / 1024);
     println!("Usable RAM:   {} MiB", sys.available_memory() / 1024 / 1024);
 }
@@ -105,46 +107,33 @@ fn print_bios_info() -> () {
 
 }
 
-#[derive(Debug, Clone)]
-pub struct UtsName {
-    pub sysname: String,
-    pub nodename: String,
-    pub release: String,
-    pub version: String,
-    pub machine: String,
+#[inline]
+fn get_hostname() -> String {
+    nix::unistd::gethostname()
+        .expect("Failed to get hostname")
+        .to_string_lossy()
+        .into_owned()
 }
 
-impl UtsName {
-    pub fn get() -> io::Result<Self> {
-        let mut raw_info: libc::utsname = unsafe { MaybeUninit::zeroed().assume_init() };
-        let res = unsafe { libc::uname(&mut raw_info) };
-        if res < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        let parse_field = |field: &[std::os::raw::c_char]| -> String {
-            unsafe {
-                CStr::from_ptr(field.as_ptr())
-                    .to_string_lossy()
-                    .into_owned()
-            }
-        };
-
-        Ok(UtsName {
-            sysname: parse_field(&raw_info.sysname),
-            nodename: parse_field(&raw_info.nodename),
-            release: parse_field(&raw_info.release),
-            version: parse_field(&raw_info.version),
-            machine: parse_field(&raw_info.machine),
-        })
+#[inline]
+fn get_username() -> String {
+    use nix::unistd;
+    let uid = unistd::getuid();
+    if let Some(user) = nix::unistd::User::from_uid(uid).unwrap() {
+        user.name
+    } else {
+        "".to_string()
     }
 }
 
+fn print_username_and_hostname() {
+    let username_and_hostname =
+        format!("{}@{}", get_username(), get_hostname());
+    println!("Name:         {}", username_and_hostname);
+}
+
 fn main() {
-    let name = UtsName::get().expect("Uname failed.");
-    println!("Hostname:     {}", name.nodename);
-    println!("OS:           {}", name.sysname);
-    println!("Machine:      {}", name.machine);
-    println!("Release:      {}", name.release);
+    print_username_and_hostname();
     let mut sys = sysinfo::System::new_all();
     sys.refresh_all();
     pollster::block_on(async {
@@ -154,10 +143,11 @@ fn main() {
             .await
             .expect("Failed to find an appropriate GPU adapter");
 
-        print_graphics_info(adapter, &mut sys);
+        print_graphics_info(adapter);
     });
     print_bios_info();
     print_motherboard_info();
+    print_available_memory(&mut sys);
     print_cpu_info(&mut sys);
     print_uptime();
     print_shell();
